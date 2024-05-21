@@ -1,23 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scream Room</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recorder and Uploader</title>
 </head>
 <body>
-  <h1>Mentally Troubled Website</h1>
-  <p>Welcome to the Scream Room, your mentally safe room. Join others' pain.</p>
+    <h1>Audio Recorder and Uploader</h1>
+    <button id="recordButton">Start Recording</button>
+    <button id="stopButton" disabled>Stop Recording</button>
+    <form id="upload-form" style="display:none;">
+        <input type="hidden" id="audio-file">
+        <button type="submit">Upload</button>
+    </form>
+    <p id="status"></p>
 
-  <button id="recordButton">Record</button>
-  <div id="recordingsList"></div>
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
 
-  <footer>
-    <p>If you feel relieved you can <a href="https://buymeacoffee.com/djelijah">buy me a coffee</a> :-)</p>
-    <p>Idea and design by Ilija Dordevic with the help of ChatGPT</p>
-  </footer>
+        document.getElementById('recordButton').addEventListener('click', () => {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
 
-  <script src="script.js"></script>
+                    mediaRecorder.addEventListener('dataavailable', event => {
+                        audioChunks.push(event.data);
+                    });
+
+                    mediaRecorder.addEventListener('stop', () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        const audio = document.createElement('audio');
+                        audio.src = audioUrl;
+                        audio.controls = true;
+                        document.body.appendChild(audio);
+
+                        // Store audio file in a hidden input field
+                        const fileReader = new FileReader();
+                        fileReader.onloadend = () => {
+                            document.getElementById('audio-file').value = fileReader.result;
+                        };
+                        fileReader.readAsDataURL(audioBlob);
+
+                        document.getElementById('upload-form').style.display = 'block';
+                        document.getElementById('status').textContent = 'Recording stopped. Ready to upload.';
+                    });
+
+                    document.getElementById('recordButton').disabled = true;
+                    document.getElementById('stopButton').disabled = false;
+                });
+        });
+
+        document.getElementById('stopButton').addEventListener('click', () => {
+            mediaRecorder.stop();
+            document.getElementById('recordButton').disabled = false;
+            document.getElementById('stopButton').disabled = true;
+        });
+
+        document.getElementById('upload-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const audioBase64 = document.getElementById('audio-file').value;
+
+            const response = await fetch('https://myscream-backaned.vercel.app/api/upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ audio: audioBase64 })
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                document.getElementById('status').textContent = `File uploaded successfully: ${result.url}`;
+            } else {
+                document.getElementById('status').textContent = `Upload failed: ${result.message}`;
+            }
+        });
+    </script>
 </body>
 </html>
