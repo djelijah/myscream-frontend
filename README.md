@@ -1,1 +1,0 @@
-# myscream-frontend
